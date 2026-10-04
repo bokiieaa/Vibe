@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIBE Stream - Pure Streaming & Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.8); }
+        ::-webkit-scrollbar-thumb { background: rgba(147, 51, 234, 0.5); border-radius: 9999px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen w-screen flex flex-col font-sans overflow-hidden antialiased select-none">
+
+    <!-- Authentication Modal -->
+    <div id="auth-modal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl max-w-md w-full shadow-2xl space-y-5">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-xl flex items-center justify-center mx-auto mb-2 text-2xl font-black">👾</div>
+                <h2 class="text-2xl font-black bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">VIBE Stream</h2>
+                <p class="text-xs text-slate-400 mt-1">Sign in to start streaming and chatting live</p>
+            </div>
+            <form id="auth-form" onsubmit="return false;" class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Username</label>
+                    <input type="text" id="auth-username" required placeholder="Enter username" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Password</label>
+                    <input type="password" id="auth-password" required placeholder="••••••••" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-purple-500">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" id="login-btn" class="flex-1 bg-purple-600 hover:bg-purple-500 text-xs font-bold py-2.5 rounded-lg transition-colors cursor-pointer">LOG IN</button>
+                    <button type="button" id="signup-btn" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold py-2.5 rounded-lg transition-colors cursor-pointer">SIGN UP</button>
+                </div>
+            </form>
+            <div id="auth-error" class="text-xs text-rose-400 hidden"></div>
+        </div>
+    </div>
+
+    <!-- Go Live Broadcast Modal -->
+    <div id="stream-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-base font-bold text-slate-100">🎥 Go Live Studio</h3>
+                <button id="close-stream-btn" class="text-slate-400 hover:text-white font-bold">&times;</button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-[11px] font-bold text-slate-400 uppercase">Stream Title</label>
+                    <input type="text" id="broadcast-title-input" placeholder="e.g. Late Night Gaming / Coding Stream" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-slate-400 uppercase">Video Source</label>
+                    <select id="stream-mode-select" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
+                        <option value="screen">Screen / Window / Tab Share</option>
+                        <option value="camera">Webcam Only</option>
+                        <option value="pip">Screen Share + Webcam PIP Corner</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <input type="checkbox" id="mic-toggle-checkbox" checked class="w-4 h-4 text-purple-600 rounded bg-slate-900 border-slate-700 focus:ring-purple-500">
+                    <label for="mic-toggle-checkbox" class="text-xs font-bold text-slate-300 cursor-pointer flex items-center gap-1.5">
+                        <span>🎙️</span> Enable Microphone Audio
+                    </label>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button id="start-broadcast-btn" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2.5 rounded-lg transition-colors">Start Live Stream</button>
+                    <button id="stop-broadcast-btn" class="hidden flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold py-2.5 rounded-lg transition-colors">End Stream</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shrink-0 gap-4">
+        <div class="flex items-center gap-2.5 shrink-0">
+            <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-base font-bold shadow-lg shadow-purple-600/30">👾</div>
+            <span class="text-base font-black tracking-wider text-slate-100 uppercase hidden sm:inline">VIBE STREAM</span>
+        </div>
+
+        <div class="flex-1 max-w-md">
+            <div class="relative">
+                <input type="text" id="search-input" placeholder="Search streamers or stream titles..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500 placeholder-slate-500">
+                <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
+            <button id="open-stream-btn" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer">
+                <span>📹</span> Go Live
+            </button>
+            <div class="h-4 w-px bg-slate-800"></div>
+            <div class="flex items-center gap-2">
+                <div id="user-avatar" class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold border border-slate-700">?</div>
+                <span id="current-user-display" class="text-xs font-semibold text-slate-300 hidden sm:inline">Guest</span>
+                <button id="logout-btn" class="text-xs text-slate-500 hover:text-slate-300 ml-1">Exit</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex-1 flex min-h-0 overflow-hidden">
+        
+        <!-- Left Sidebar: Live Streamers -->
+        <aside class="w-64 bg-slate-900/60 border-r border-slate-800 flex flex-col shrink-0 hidden md:flex">
+            <div class="p-3 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Live Streams
+            </div>
+            <div id="streamers-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+        </aside>
+
+        <!-- Center: 16:9 Video Stream Player -->
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto items-center justify-center p-4">
+            <div class="w-full max-w-6xl aspect-video bg-black rounded-2xl border border-slate-800 overflow-hidden relative flex items-center justify-center shadow-2xl">
+                <video id="stream-video" class="w-full h-full object-contain" autoplay loop muted playsinline></video>
+                <video id="pip-camera-overlay" class="hidden absolute bottom-6 right-6 w-44 h-32 rounded-xl border-2 border-purple-500 shadow-2xl object-cover bg-black z-20" autoplay muted playsinline></video>
+
+                <!-- Live Tag Overlay -->
+                <div id="live-indicator" class="hidden absolute top-4 left-4 bg-slate-950/80 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg items-center gap-2 z-10">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                    <span id="active-username" class="text-xs font-black text-purple-400">@Guest</span>
+                </div>
+
+                <!-- Placeholder when offline -->
+                <div id="offline-placeholder" class="text-center space-y-2 p-6">
+                    <div class="text-4xl">📺</div>
+                    <div class="text-sm font-bold text-slate-400">No active stream selected</div>
+                    <p class="text-xs text-slate-600">Click "Go Live" or select a creator from the sidebar.</p>
+                </div>
+            </div>
+
+            <!-- Stream Controls / Footer -->
+            <div class="w-full max-w-6xl mt-3 bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div id="active-stream-avatar" class="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center font-bold text-xs">?</div>
+                    <div>
+                        <h2 id="active-stream-title" class="text-xs font-bold text-slate-100">Offline</h2>
+                        <p id="active-stream-author" class="text-[11px] text-slate-400">Not broadcasting</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="toggle-mute-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 transition-colors">
+                        🔊 Mute / Unmute
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Live Chat -->
+        <aside class="w-80 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0">
+            <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                <span>Live Chat</span>
+                <button id="popout-chat-btn" title="Pop out over games/screens" class="text-[11px] text-purple-400 hover:text-purple-300 bg-purple-600/10 hover:bg-purple-600/20 border border-purple-500/30 px-2 py-1 rounded-md transition-colors flex items-center gap-1">
+                    <span>↗</span> Pop Out
+                </button>
+            </div>
+            
+            <div id="chat-box" class="flex-1 p-3 overflow-y-auto space-y-2 text-xs">
+                <div class="text-slate-500 italic text-[11px] text-center">Welcome to the live chat!</div>
+            </div>
+
+            <form id="chat-form" class="p-3 border-t border-slate-800 flex gap-2">
+                <input type="text" id="chat-input" placeholder="Send a message..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
+                <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Send</button>
+            </form>
+        </aside>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://aibfznbgzgjdsufgaxuo.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_e_CqJETIOnvnJY5U4twlow_J9n1muxx";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let localStream = null;
+        let cameraPipStream = null;
+        let activeStream = null;
+        let searchQuery = "";
+        let chatChannel = null;
+        let pipWindow = null;
+
+        let STREAMS = []; // Pure active user streams only
+
+        const authModal = document.getElementById('auth-modal');
+        const authError = document.getElementById('auth-error');
+        const streamVideo = document.getElementById('stream-video');
+        const pipCamera = document.getElementById('pip-camera-overlay');
+        const streamersList = document.getElementById('streamers-list');
+        const searchInput = document.getElementById('search-input');
+        const chatBox = document.getElementById('chat-box');
+        const offlinePlaceholder = document.getElementById('offline-placeholder');
+        const liveIndicator = document.getElementById('live-indicator');
+
+        async function hashPassword(password) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        document.getElementById('signup-btn').addEventListener('click', async () => {
+            authError.classList.add('hidden');
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value;
+
+            if (!username || !password) return showAuthError("Username and password required.");
+            const passwordHash = await hashPassword(password);
+            const userId = crypto.randomUUID();
+            const { error } = await supabaseClient.from('profiles').insert([{ id: userId, username, password_hash: passwordHash }]);
+            if (error) return showAuthError("Account creation failed: " + error.message);
+
+            initSession({ id: userId, username });
+        });
+
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            authError.classList.add('hidden');
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value;
+
+            if (!username || !password) return showAuthError("Username and password required.");
+            const passwordHash = await hashPassword(password);
+            const { data: userProfile } = await supabaseClient.from('profiles').select('*').eq('username', username).maybeSingle();
+
+            if (!userProfile || userProfile.password_hash !== passwordHash) return showAuthError("Invalid credentials.");
+            initSession({ id: userProfile.id, username: userProfile.username });
+        });
+
+        function showAuthError(msg) { authError.textContent = msg; authError.classList.remove('hidden'); }
+
+        function initSession(user) {
+            currentUser = user;
+            document.getElementById('current-user-display').textContent = user.username;
+            document.getElementById('user-avatar').textContent = user.username.charAt(0).toUpperCase();
+            authModal.classList.add('hidden');
+            renderStreamers();
+            setupLiveChat();
+        }
+
+        document.getElementById('logout-btn').addEventListener('click', () => { window.location.reload(); });
+
+        function renderStreamers() {
+            streamersList.innerHTML = '';
+            const filtered = STREAMS.filter(s => 
+                s.username.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                s.title.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            if (filtered.length === 0) {
+                streamersList.innerHTML = `<div class="text-xs text-slate-500 p-3 text-center">No active streams online.</div>`;
+                return;
+            }
+
+            filtered.forEach(stream => {
+                const btn = document.createElement('button');
+                btn.className = `w-full p-2 rounded-xl flex items-center gap-2.5 transition-colors text-left ${activeStream?.username === stream.username ? 'bg-purple-600/20 border border-purple-500/30' : 'hover:bg-slate-800/60'}`;
+                btn.onclick = () => selectStream(stream);
+
+                btn.innerHTML = `
+                    <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold text-xs shrink-0">${stream.username.charAt(0).toUpperCase()}</div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-bold text-slate-200 truncate">${escapeHtml(stream.username)}</div>
+                        <div class="text-[10px] text-slate-400 truncate">${escapeHtml(stream.title)}</div>
+                    </div>
+                    <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+                `;
+                streamersList.appendChild(btn);
+            });
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            renderStreamers();
+        });
+
+        function selectStream(stream) {
+            activeStream = stream;
+            offlinePlaceholder.classList.add('hidden');
+            liveIndicator.classList.remove('hidden');
+            liveIndicator.classList.add('flex');
+
+            document.getElementById('active-username').textContent = `@${stream.username}`;
+            document.getElementById('active-stream-title').textContent = stream.title;
+            document.getElementById('active-stream-author').innerHTML = `Broadcasting live as <span class="text-purple-400 font-semibold">@${escapeHtml(stream.username)}</span>`;
+            document.getElementById('active-stream-avatar').textContent = stream.username.charAt(0).toUpperCase();
+
+            if (!localStream) {
+                streamVideo.srcObject = null;
+                streamVideo.src = stream.videoUrl || '';
+                if(stream.videoUrl) streamVideo.play();
+            }
+            renderStreamers();
+        }
+
+        // --- REALTIME CHAT SYSTEM ---
+        function setupLiveChat() {
+            chatChannel = supabaseClient.channel('vibe_global_chat');
+            chatChannel.on('broadcast', { event: 'chat_msg' }, ({ payload }) => {
+                appendChatMessage(payload.sender, payload.message);
+            }).subscribe();
+        }
+
+        document.getElementById('chat-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg || !currentUser) return;
+
+            chatChannel.send({
+                type: 'broadcast',
+                event: 'chat_msg',
+                payload: { sender: currentUser.username, message: msg }
+            });
+
+            appendChatMessage(currentUser.username, msg);
+            input.value = '';
+        });
+
+        function appendChatMessage(sender, msg) {
+            const el = document.createElement('div');
+            el.className = "text-slate-300 leading-tight bg-slate-950/60 p-2 rounded-lg border border-slate-800/80";
+            el.innerHTML = `<b class="text-purple-400">${escapeHtml(sender)}:</b> ${escapeHtml(msg)}`;
+            chatBox.appendChild(el);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Mirror chat into floating window if popped out
+            if (pipWindow && pipWindow.document) {
+                const pipChatBox = pipWindow.document.getElementById('pip-chat-box');
+                if (pipChatBox) {
+                    const pipEl = el.cloneNode(true);
+                    pipChatBox.appendChild(pipEl);
+                    pipChatBox.scrollTop = pipChatBox.scrollHeight;
+                }
+            }
+        }
+
+        // --- TRUE SYSTEM OVERLAY CHAT (DOCUMENT PICTURE-IN-PICTURE API) ---
+        document.getElementById('popout-chat-btn').addEventListener('click', async () => {
+            if (!('documentPictureInPicture' in window)) {
+                alert("System overlay chat requires Chrome/Edge 116+ or a browser supporting the Document Picture-in-Picture API.");
+                return;
+            }
+
+            try {
+                pipWindow = await window.documentPictureInPicture.requestWindow({
+                    width: 320,
+                    height: 450,
+                });
+
+                // Style the floating overlay window
+                pipWindow.document.body.className = "bg-slate-950 text-slate-100 flex flex-col h-screen font-sans antialiased p-2 overflow-hidden";
+                pipWindow.document.head.innerHTML = `<script src="https://cdn.tailwindcss.com"><\/script>`;
+
+                pipWindow.document.body.innerHTML = `
+                    <div class="text-xs font-bold text-purple-400 mb-2 flex items-center justify-between border-b border-slate-800 pb-1.5">
+                        <span>💬 System Chat Overlay</span>
+                        <span class="text-[9px] text-emerald-400">● Always-On-Top</span>
+                    </div>
+                    <div id="pip-chat-box" class="flex-1 overflow-y-auto space-y-1.5 text-xs pr-1"></div>
+                    <form id="pip-chat-form" class="mt-2 flex gap-1">
+                        <input type="text" id="pip-chat-input" placeholder="Chat over game..." class="flex-1 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-purple-500">
+                        <button type="submit" class="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded">Send</button>
+                    </form>
+                `;
+
+                // Sync current chat messages
+                const pipChatBox = pipWindow.document.getElementById('pip-chat-box');
+                pipChatBox.innerHTML = chatBox.innerHTML;
+                pipChatBox.scrollTop = pipChatBox.scrollHeight;
+
+                // Handle sending messages from floating popout window
+                pipWindow.document.getElementById('pip-chat-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const input = pipWindow.document.getElementById('pip-chat-input');
+                    const msg = input.value.trim();
+                    if (!msg || !currentUser) return;
+
+                    chatChannel.send({
+                        type: 'broadcast',
+                        event: 'chat_msg',
+                        payload: { sender: currentUser.username, message: msg }
+                    });
+
+                    appendChatMessage(currentUser.username, msg);
+                    input.value = '';
+                });
+
+            } catch (err) {
+                alert("Could not open floating overlay: " + err.message);
+            }
+        });
+
+        // --- STREAMING CONTROLS ---
+        document.getElementById('open-stream-btn').addEventListener('click', () => { document.getElementById('stream-modal').classList.remove('hidden'); });
+        document.getElementById('close-stream-btn').addEventListener('click', () => { document.getElementById('stream-modal').classList.add('hidden'); });
+
+        document.getElementById('start-broadcast-btn').addEventListener('click', async () => {
+            const title = document.getElementById('broadcast-title-input').value.trim() || `${currentUser.username}'s Live Stream`;
+            const mode = document.getElementById('stream-mode-select').value;
+            const useMic = document.getElementById('mic-toggle-checkbox').checked;
+            
+            stopBroadcast();
+
+            try {
+                let micAudioTrack = null;
+
+                if (useMic) {
+                    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    micAudioTrack = micStream.getAudioTracks()[0];
+                }
+
+                if (mode === 'screen') {
+                    localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                    if (micAudioTrack) localStream.addTrack(micAudioTrack);
+                    streamVideo.srcObject = localStream;
+
+                } else if (mode === 'camera') {
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: useMic });
+                    streamVideo.srcObject = localStream;
+
+                } else if (mode === 'pip') {
+                    localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                    cameraPipStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: useMic });
+                    
+                    if (micAudioTrack && !cameraPipStream.getAudioTracks().length) {
+                        localStream.addTrack(micAudioTrack);
+                    }
+
+                    streamVideo.srcObject = localStream;
+                    pipCamera.srcObject = cameraPipStream;
+                    pipCamera.classList.remove('hidden');
+                }
+
+                streamVideo.play();
+                document.getElementById('start-broadcast-btn').classList.add('hidden');
+                document.getElementById('stop-broadcast-btn').classList.remove('hidden');
+
+                const userStream = { id: Date.now().toString(), username: currentUser.username, title: title, videoUrl: "" };
+                const existingIdx = STREAMS.findIndex(s => s.username === currentUser.username);
+                if (existingIdx !== -1) STREAMS[existingIdx] = userStream;
+                else STREAMS.unshift(userStream);
+
+                selectStream(userStream);
+                document.getElementById('stream-modal').classList.add('hidden');
+            } catch (err) {
+                alert("Could not start broadcast: " + err.message);
+            }
+        });
+
+        document.getElementById('stop-broadcast-btn').addEventListener('click', stopBroadcast);
+
+        function stopBroadcast() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (cameraPipStream) {
+                cameraPipStream.getTracks().forEach(track => track.stop());
+                cameraPipStream = null;
+            }
+            pipCamera.classList.add('hidden');
+            streamVideo.srcObject = null;
+            document.getElementById('start-broadcast-btn').classList.remove('hidden');
+            document.getElementById('stop-broadcast-btn').classList.add('hidden');
+            
+            STREAMS = STREAMS.filter(s => s.username !== currentUser?.username);
+            renderStreamers();
+
+            if (STREAMS.length > 0) {
+                selectStream(STREAMS[0]);
+            } else {
+                activeStream = null;
+                offlinePlaceholder.classList.remove('hidden');
+                liveIndicator.classList.add('hidden');
+                liveIndicator.classList.remove('flex');
+                document.getElementById('active-stream-title').textContent = "Offline";
+                document.getElementById('active-stream-author').textContent = "Not broadcasting";
+            }
+        }
+
+        document.getElementById('toggle-mute-btn').addEventListener('click', () => {
+            streamVideo.muted = !streamVideo.muted;
+        });
+
+        function escapeHtml(str) {
+            return (str || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+        }
+    </script>
+</body>
+</html>

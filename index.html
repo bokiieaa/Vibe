@@ -107,7 +107,7 @@
             <div id="streamers-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
         </aside>
 
-        <!-- Video Player (Locked 16:9) -->
+        <!-- Video Player -->
         <main class="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto items-center justify-center p-4">
             <div class="w-full max-w-6xl aspect-video bg-black rounded-2xl border border-slate-800 overflow-hidden relative flex items-center justify-center shadow-2xl">
                 <video id="stream-video" class="w-full h-full object-contain" autoplay playsinline></video>
@@ -139,9 +139,6 @@
         <aside class="w-80 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0">
             <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
                 <span>Live Chat</span>
-                <button id="popout-chat-btn" class="text-[11px] text-purple-400 hover:text-purple-300 bg-purple-600/10 border border-purple-500/30 px-2 py-1 rounded-md">
-                    <span>↗</span> Pop Out
-                </button>
             </div>
             
             <div id="chat-box" class="flex-1 p-3 overflow-y-auto space-y-2 text-xs"></div>
@@ -158,31 +155,28 @@
         const SUPABASE_ANON_KEY = "sb_publishable_e_CqJETIOnvnJY5U4twlow_J9n1muxx";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // STUN + Open TURN servers for cross-network connectivity
         const rtcConfig = {
             iceServers: [
-                {
-                    urls: "stun:stun.relay.metered.ca:80",
-                },
+                { urls: "stun:stun.relay.metered.ca:80" },
                 {
                     urls: "turn:global.relay.metered.ca:80",
                     username: "41aface251ef6a7afaaa477e",
-                    credential: "3wyaDDGf6ywjwOhi",
+                    credential: "3wyaDDGf6ywjwOhi"
                 },
                 {
                     urls: "turn:global.relay.metered.ca:80?transport=tcp",
                     username: "41aface251ef6a7afaaa477e",
-                    credential: "3wyaDDGf6ywjwOhi",
+                    credential: "3wyaDDGf6ywjwOhi"
                 },
                 {
                     urls: "turn:global.relay.metered.ca:443",
                     username: "41aface251ef6a7afaaa477e",
-                    credential: "3wyaDDGf6ywjwOhi",
+                    credential: "3wyaDDGf6ywjwOhi"
                 },
                 {
                     urls: "turns:global.relay.metered.ca:443?transport=tcp",
                     username: "41aface251ef6a7afaaa477e",
-                    credential: "3wyaDDGf6ywjwOhi",
+                    credential: "3wyaDDGf6ywjwOhi"
                 }
             ]
         };
@@ -212,7 +206,11 @@
             if (!u || !p) return;
             const hash = await hashPassword(p);
             const { data } = await supabaseClient.from('profiles').select('*').eq('username', u).maybeSingle();
-            if (data && data.password_hash === hash) initSession({ id: data.id, username: data.username });
+            if (data && data.password_hash === hash) {
+                initSession({ id: data.id, username: data.username });
+            } else {
+                showAuthError("Invalid username or password");
+            }
         };
 
         document.getElementById('signup-btn').onclick = async () => {
@@ -221,9 +219,23 @@
             if (!u || !p) return;
             const hash = await hashPassword(p);
             const id = crypto.randomUUID();
-            await supabaseClient.from('profiles').insert([{ id, username: u, password_hash: hash }]);
-            initSession({ id, username: u });
+            const { error } = await supabaseClient.from('profiles').insert([{ id, username: u, password_hash: hash }]);
+            if (error) {
+                showAuthError("Username already exists or sign up failed");
+            } else {
+                initSession({ id, username: u });
+            }
         };
+
+        document.getElementById('logout-btn').onclick = () => {
+            location.reload();
+        };
+
+        function showAuthError(msg) {
+            const errEl = document.getElementById('auth-error');
+            errEl.textContent = msg;
+            errEl.classList.remove('hidden');
+        }
 
         function initSession(user) {
             currentUser = user;
@@ -280,7 +292,6 @@
 
         document.getElementById('refresh-btn').onclick = fetchLiveStreams;
 
-        // Cross-Network Multi-Peer Signaling
         function setupRealtimeSignaling() {
             supabaseClient.channel('db_streams')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'streams' }, () => fetchLiveStreams())
@@ -348,7 +359,6 @@
             });
         }
 
-        // Broadcaster Logic
         document.getElementById('open-stream-btn').onclick = () => document.getElementById('stream-modal').classList.remove('hidden');
         document.getElementById('close-stream-btn').onclick = () => document.getElementById('stream-modal').classList.add('hidden');
 
@@ -421,7 +431,6 @@
             fetchLiveStreams();
         };
 
-        // Chat System
         function setupChat() {
             const chatChan = supabaseClient.channel('vibe_chat');
             chatChan.on('broadcast', { event: 'chat_msg' }, ({ payload }) => {

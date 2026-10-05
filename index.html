@@ -3,61 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VIBE Stream - Global WebRTC Live</title>
+    <title>LAN WebRTC Live Stream</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.8); }
-        ::-webkit-scrollbar-thumb { background: rgba(147, 51, 234, 0.5); border-radius: 9999px; }
-    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 h-screen w-screen flex flex-col font-sans overflow-hidden antialiased select-none">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center p-6">
 
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl max-w-md w-full shadow-2xl space-y-5">
-            <div class="text-center">
-                <div class="w-12 h-12 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-xl flex items-center justify-center mx-auto mb-2 text-2xl font-black">👾</div>
-                <h2 class="text-2xl font-black bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">VIBE Stream</h2>
-                <p class="text-xs text-slate-400 mt-1">Sign in to start streaming and chatting live</p>
-            </div>
-            <form id="auth-form" onsubmit="return false;" class="space-y-4">
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Username</label>
-                    <input type="text" id="auth-username" required placeholder="Enter username" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-purple-500">
-                </div>
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Password</label>
-                    <input type="password" id="auth-password" required placeholder="••••••••" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-purple-500">
-                </div>
-                <div class="flex gap-2 pt-2">
-                    <button type="button" id="login-btn" class="flex-1 bg-purple-600 hover:bg-purple-500 text-xs font-bold py-2.5 rounded-lg transition-colors cursor-pointer">LOG IN</button>
-                    <button type="button" id="signup-btn" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold py-2.5 rounded-lg transition-colors cursor-pointer">SIGN UP</button>
-                </div>
-            </form>
-            <div id="auth-error" class="text-xs text-rose-400 hidden"></div>
+    <!-- Header -->
+    <header class="w-full max-w-4xl flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+        <h1 class="text-xl font-bold tracking-tight text-purple-400">LAN Broadcast Hub</h1>
+        <button id="open-modal-btn" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+            Go Live
+        </button>
+    </header>
+
+    <!-- Main Video Player -->
+    <main class="w-full max-w-4xl bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-slate-800 relative">
+        <video id="stream-video" autoplay playsinline controls class="w-full aspect-video bg-black object-contain"></video>
+        <div id="status-badge" class="absolute top-4 left-4 bg-red-600/80 text-white text-xs px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider backdrop-blur-sm hidden">
+            Live
         </div>
-    </div>
+    </main>
 
-    <!-- Go Live Modal -->
-    <div id="stream-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center">
-                <h3 class="text-base font-bold text-slate-100">🎥 Go Live Studio</h3>
-                <button id="close-stream-btn" class="text-slate-400 hover:text-white font-bold">&times;</button>
+    <!-- Modal for Broadcast Settings -->
+    <div id="stream-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center hidden z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 w-full max-w-md space-y-4 shadow-xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h2 class="text-sm font-bold text-slate-200">Broadcast Setup (Local Wi-Fi Only)</h2>
+                <button id="close-modal-btn" class="text-slate-400 hover:text-white text-sm">✕</button>
             </div>
+
             <div class="space-y-3">
                 <div>
                     <label class="text-[11px] font-bold text-slate-400 uppercase">Stream Title</label>
-                    <input type="text" id="broadcast-title-input" placeholder="e.g. Late Night Gaming Stream" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
+                    <input type="text" id="broadcast-title-input" placeholder="e.g. Local Gaming Stream" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
                 </div>
-                <div>
-                    <label class="text-[11px] font-bold text-slate-400 uppercase">Video Source</label>
-                    <select id="stream-mode-select" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
-                        <option value="screen">Screen / Window / Tab Share</option>
-                        <option value="camera">Webcam Only</option>
-                    </select>
+                
+                <!-- Audio / Video Options -->
+                <div class="space-y-2 pt-1 border-t border-slate-800/60 mt-3">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input type="checkbox" id="mic-toggle" checked class="rounded border-slate-800 bg-slate-950 text-purple-600 focus:ring-purple-500">
+                        <span>🎙️ Enable Microphone Voiceover</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input type="checkbox" id="camera-corner-toggle" class="rounded border-slate-800 bg-slate-950 text-purple-600 focus:ring-purple-500">
+                        <span>📷 Add Camera in Corner (PiP)</span>
+                    </label>
                 </div>
 
                 <div class="flex gap-2 pt-2">
@@ -68,329 +59,129 @@
         </div>
     </div>
 
-    <!-- Navigation Header -->
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shrink-0 gap-4">
-        <div class="flex items-center gap-2.5 shrink-0">
-            <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-base font-bold shadow-lg shadow-purple-600/30">👾</div>
-            <span class="text-base font-black tracking-wider text-slate-100 uppercase hidden sm:inline">VIBE STREAM</span>
-        </div>
-
-        <div class="flex-1 max-w-md">
-            <div class="relative">
-                <input type="text" id="search-input" placeholder="Search streamers or stream titles..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500 placeholder-slate-500">
-                <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            </div>
-        </div>
-
-        <div class="flex items-center gap-3 shrink-0">
-            <button id="open-stream-btn" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer">
-                <span>📹</span> Go Live
-            </button>
-            <div class="h-4 w-px bg-slate-800"></div>
-            <div class="flex items-center gap-2">
-                <div id="user-avatar" class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold border border-slate-700">?</div>
-                <span id="current-user-display" class="text-xs font-semibold text-slate-300 hidden sm:inline">Guest</span>
-                <button id="logout-btn" class="text-xs text-slate-500 hover:text-slate-300 ml-1">Exit</button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Container -->
-    <div class="flex-1 flex min-h-0 overflow-hidden">
-        
-        <!-- Streamers Sidebar -->
-        <aside class="w-64 bg-slate-900/60 border-r border-slate-800 flex flex-col shrink-0 hidden md:flex">
-            <div class="p-3 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                <span>Live Streams</span>
-                <button id="refresh-btn" class="text-purple-400 hover:text-purple-300 text-[10px]">🔄 Refresh</button>
-            </div>
-            <div id="streamers-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
-        </aside>
-
-        <!-- Video Player -->
-        <main class="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto items-center justify-center p-4">
-            <div class="w-full max-w-6xl aspect-video bg-black rounded-2xl border border-slate-800 overflow-hidden relative flex items-center justify-center shadow-2xl">
-                <video id="stream-video" class="w-full h-full object-contain" autoplay playsinline></video>
-
-                <div id="live-indicator" class="hidden absolute top-4 left-4 bg-slate-950/80 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg items-center gap-2 z-10">
-                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
-                    <span id="active-username" class="text-xs font-black text-purple-400">@Guest</span>
-                </div>
-
-                <div id="offline-placeholder" class="text-center space-y-2 p-6">
-                    <div class="text-4xl">📺</div>
-                    <div class="text-sm font-bold text-slate-400">No active stream selected</div>
-                    <p class="text-xs text-slate-600">Select a stream from the left menu or click "Go Live".</p>
-                </div>
-            </div>
-
-            <div class="w-full max-w-6xl mt-3 bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between shrink-0">
-                <div class="flex items-center gap-3">
-                    <div id="active-stream-avatar" class="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center font-bold text-xs">?</div>
-                    <div>
-                        <h2 id="active-stream-title" class="text-xs font-bold text-slate-100">Offline</h2>
-                        <p id="active-stream-author" class="text-[11px] text-slate-400">Not broadcasting</p>
-                    </div>
-                </div>
-            </div>
-        </main>
-
-        <!-- Right Side Live Chat -->
-        <aside class="w-80 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0">
-            <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                <span>Live Chat</span>
-            </div>
-            
-            <div id="chat-box" class="flex-1 p-3 overflow-y-auto space-y-2 text-xs"></div>
-
-            <form id="chat-form" class="p-3 border-t border-slate-800 flex gap-2">
-                <input type="text" id="chat-input" placeholder="Send a message..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
-                <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Send</button>
-            </form>
-        </aside>
-    </div>
-
     <script>
-        const SUPABASE_URL = "https://aibfznbgzgjdsufgaxuo.supabase.co";
-        const SUPABASE_ANON_KEY = "sb_publishable_e_CqJETIOnvnJY5U4twlow_J9n1muxx";
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // --- Supabase Initialization ---
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const rtcConfig = {
-            iceServers: [
-                { urls: "stun:stun.relay.metered.ca:80" },
-                {
-                    urls: "turn:global.relay.metered.ca:80",
-                    username: "41aface251ef6a7afaaa477e",
-                    credential: "3wyaDDGf6ywjwOhi"
-                },
-                {
-                    urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                    username: "41aface251ef6a7afaaa477e",
-                    credential: "3wyaDDGf6ywjwOhi"
-                },
-                {
-                    urls: "turn:global.relay.metered.ca:443",
-                    username: "41aface251ef6a7afaaa477e",
-                    credential: "3wyaDDGf6ywjwOhi"
-                },
-                {
-                    urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                    username: "41aface251ef6a7afaaa477e",
-                    credential: "3wyaDDGf6ywjwOhi"
-                }
-            ]
+        const currentUser = { username: 'User_' + Math.floor(Math.random() * 1000) };
+        const signalChannel = supabaseClient.channel('webrtc_signaling');
+        signalChannel.subscribe();
+
+        // --- LAN WebRTC Configuration ---
+        // Empty iceServers enforces local network host candidates only (no public STUN/TURN)
+        const localRtcConfig = {
+            iceServers: [],
+            iceTransportPolicy: 'all'
         };
 
-        let currentUser = null;
         let localStream = null;
-        let peerConnections = {};
-        let signalChannel = null;
-        let activeStreamerUsername = null;
-        let STREAMS = [];
-        let searchQuery = "";
-
-        const authModal = document.getElementById('auth-modal');
+        const peerConnections = {};
         const streamVideo = document.getElementById('stream-video');
-        const streamersList = document.getElementById('streamers-list');
-        const searchInput = document.getElementById('search-input');
-        const chatBox = document.getElementById('chat-box');
+        const statusBadge = document.getElementById('status-badge');
 
-        async function hashPassword(p) {
-            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(p));
-            return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        // Check if candidate is restricted to host / LAN interfaces
+        function isLocalCandidate(candidate) {
+            if (!candidate || !candidate.candidate) return false;
+            const c = candidate.candidate;
+            return c.includes('typ host') || c.includes('192.168.') || c.includes('10.') || c.includes('172.');
         }
 
-        document.getElementById('login-btn').onclick = async () => {
-            const u = document.getElementById('auth-username').value.trim();
-            const p = document.getElementById('auth-password').value;
-            if (!u || !p) return;
-            const hash = await hashPassword(p);
-            const { data } = await supabaseClient.from('profiles').select('*').eq('username', u).maybeSingle();
-            if (data && data.password_hash === hash) {
-                initSession({ id: data.id, username: data.username });
-            } else {
-                showAuthError("Invalid username or password");
-            }
-        };
+        // --- Modal UI Controls ---
+        const modal = document.getElementById('stream-modal');
+        document.getElementById('open-modal-btn').onclick = () => modal.classList.remove('hidden');
+        document.getElementById('close-modal-btn').onclick = () => modal.classList.add('hidden');
 
-        document.getElementById('signup-btn').onclick = async () => {
-            const u = document.getElementById('auth-username').value.trim();
-            const p = document.getElementById('auth-password').value;
-            if (!u || !p) return;
-            const hash = await hashPassword(p);
-            const id = crypto.randomUUID();
-            const { error } = await supabaseClient.from('profiles').insert([{ id, username: u, password_hash: hash }]);
-            if (error) {
-                showAuthError("Username already exists or sign up failed");
-            } else {
-                initSession({ id, username: u });
-            }
-        };
-
-        document.getElementById('logout-btn').onclick = () => {
-            location.reload();
-        };
-
-        function showAuthError(msg) {
-            const errEl = document.getElementById('auth-error');
-            errEl.textContent = msg;
-            errEl.classList.remove('hidden');
-        }
-
-        function initSession(user) {
-            currentUser = user;
-            document.getElementById('current-user-display').textContent = user.username;
-            document.getElementById('user-avatar').textContent = user.username.charAt(0).toUpperCase();
-            authModal.classList.add('hidden');
-            
-            fetchLiveStreams();
-            setupRealtimeSignaling();
-            setupChat();
-        }
-
-        async function fetchLiveStreams() {
-            let query = supabaseClient.from('streams').select('*').eq('is_live', true);
-            if (searchQuery) {
-                query = query.or(`username.ilike.%${searchQuery}%,title.ilike.%${searchQuery}%`);
-            }
-
-            const { data, error } = await query;
-            if (!error) {
-                STREAMS = data || [];
-                renderStreamers();
-            }
-        }
-
-        function renderStreamers() {
-            streamersList.innerHTML = '';
-            if (STREAMS.length === 0) {
-                streamersList.innerHTML = `<div class="text-xs text-slate-500 p-3 text-center">No active streams online.</div>`;
-                return;
-            }
-
-            STREAMS.forEach(stream => {
-                const btn = document.createElement('button');
-                btn.className = `w-full p-2 rounded-xl flex items-center gap-2.5 transition-colors text-left ${activeStreamerUsername === stream.username ? 'bg-purple-600/20 border border-purple-500/30' : 'hover:bg-slate-800/60'}`;
-                btn.onclick = () => watchStream(stream);
-
-                btn.innerHTML = `
-                    <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold text-xs shrink-0">${stream.username.charAt(0).toUpperCase()}</div>
-                    <div class="min-w-0 flex-1">
-                        <div class="text-xs font-bold text-slate-200 truncate">${escapeHtml(stream.username)}</div>
-                        <div class="text-[10px] text-slate-400 truncate">${escapeHtml(stream.title)}</div>
-                    </div>
-                    <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                `;
-                streamersList.appendChild(btn);
-            });
-        }
-
-        searchInput.oninput = (e) => {
-            searchQuery = e.target.value;
-            fetchLiveStreams();
-        };
-
-        document.getElementById('refresh-btn').onclick = fetchLiveStreams;
-
-        function setupRealtimeSignaling() {
-            supabaseClient.channel('db_streams')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'streams' }, () => fetchLiveStreams())
-                .subscribe();
-
-            signalChannel = supabaseClient.channel('webrtc_signaling');
-            
-            signalChannel.on('broadcast', { event: 'signal' }, async ({ payload }) => {
-                if (payload.target !== currentUser.username) return;
-
-                const sender = payload.sender;
-
-                if (payload.type === 'offer') {
-                    const pc = new RTCPeerConnection(rtcConfig);
-                    peerConnections[sender] = pc;
-
-                    pc.ontrack = (e) => { streamVideo.srcObject = e.streams[0]; };
-                    pc.onicecandidate = (e) => {
-                        if (e.candidate) {
-                            signalChannel.send({
-                                type: 'broadcast',
-                                event: 'signal',
-                                payload: { target: sender, sender: currentUser.username, type: 'candidate', candidate: e.candidate }
-                            });
-                        }
-                    };
-
-                    await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-
-                    signalChannel.send({
-                        type: 'broadcast',
-                        event: 'signal',
-                        payload: { target: sender, sender: currentUser.username, type: 'answer', answer: answer }
-                    });
-
-                } else if (payload.type === 'answer' && peerConnections[sender]) {
-                    await peerConnections[sender].setRemoteDescription(new RTCSessionDescription(payload.answer));
-                } else if (payload.type === 'candidate' && peerConnections[sender]) {
-                    await peerConnections[sender].addIceCandidate(new RTCIceCandidate(payload.candidate));
-                }
-            }).subscribe();
-        }
-
-        async function watchStream(stream) {
-            activeStreamerUsername = stream.username;
-            document.getElementById('offline-placeholder').classList.add('hidden');
-            document.getElementById('live-indicator').classList.remove('hidden');
-            document.getElementById('live-indicator').classList.add('flex');
-
-            document.getElementById('active-username').textContent = `@${stream.username}`;
-            document.getElementById('active-stream-title').textContent = stream.title;
-            document.getElementById('active-stream-author').textContent = `Broadcasting live`;
-
-            if (stream.username === currentUser.username && localStream) {
-                streamVideo.srcObject = localStream;
-                return;
-            }
-
-            signalChannel.send({
-                type: 'broadcast',
-                event: 'signal',
-                payload: { target: stream.username, sender: currentUser.username, type: 'join_request' }
-            });
-        }
-
-        document.getElementById('open-stream-btn').onclick = () => document.getElementById('stream-modal').classList.remove('hidden');
-        document.getElementById('close-stream-btn').onclick = () => document.getElementById('stream-modal').classList.add('hidden');
-
+        // --- Start Broadcast Logic ---
         document.getElementById('start-broadcast-btn').onclick = async () => {
-            const title = document.getElementById('broadcast-title-input').value.trim() || `${currentUser.username}'s Live Stream`;
-            const mode = document.getElementById('stream-mode-select').value;
+            const title = document.getElementById('broadcast-title-input').value.trim() || `${currentUser.username}'s Stream`;
+            const includeMic = document.getElementById('mic-toggle').checked;
+            const includeCamCorner = document.getElementById('camera-corner-toggle').checked;
 
             try {
-                if (mode === 'screen') {
-                    localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                } else {
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                // 1. Capture Screen Display
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                let finalStream = new MediaStream();
+
+                // 2. Audio Mixing (Mic + System Audio)
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const dest = audioCtx.createMediaStreamDestination();
+
+                if (screenStream.getAudioTracks().length > 0) {
+                    const systemSource = audioCtx.createMediaStreamSource(new MediaStream([screenStream.getAudioTracks()[0]]));
+                    systemSource.connect(dest);
                 }
 
-                streamVideo.srcObject = localStream;
+                if (includeMic) {
+                    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const micSource = audioCtx.createMediaStreamSource(micStream);
+                    micSource.connect(dest);
+                }
 
+                dest.stream.getAudioTracks().forEach(track => finalStream.addTrack(track));
+
+                // 3. Camera Picture-in-Picture or Direct Video
+                if (includeCamCorner) {
+                    const camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+                    
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    const screenVideoElem = document.createElement('video');
+                    screenVideoElem.srcObject = screenStream;
+                    screenVideoElem.muted = true;
+                    await screenVideoElem.play();
+
+                    const camVideoElem = document.createElement('video');
+                    camVideoElem.srcObject = camStream;
+                    camVideoElem.muted = true;
+                    await camVideoElem.play();
+
+                    canvas.width = screenVideoElem.videoWidth || 1280;
+                    canvas.height = screenVideoElem.videoHeight || 720;
+
+                    function drawFrame() {
+                        if (!localStream) return;
+                        ctx.drawImage(screenVideoElem, 0, 0, canvas.width, canvas.height);
+
+                        const camW = canvas.width * 0.22;
+                        const camH = camW * (3 / 4);
+                        const margin = 20;
+                        ctx.drawImage(camVideoElem, canvas.width - camW - margin, canvas.height - camH - margin, camW, camH);
+
+                        requestAnimationFrame(drawFrame);
+                    }
+                    drawFrame();
+
+                    const canvasStream = canvas.captureStream(30);
+                    canvasStream.getVideoTracks().forEach(track => finalStream.addTrack(track));
+                } else {
+                    screenStream.getVideoTracks().forEach(track => finalStream.addTrack(track));
+                }
+
+                localStream = finalStream;
+                streamVideo.srcObject = localStream;
+                statusBadge.classList.remove('hidden');
+
+                // Save status in DB
                 await supabaseClient.from('streams').upsert({
                     username: currentUser.username,
                     title: title,
                     is_live: true
                 }, { onConflict: 'username' });
 
+                // Multi-peer signaling
                 signalChannel.on('broadcast', { event: 'signal' }, async ({ payload }) => {
                     if (payload.target === currentUser.username && payload.type === 'join_request') {
                         const viewer = payload.sender;
-                        const pc = new RTCPeerConnection(rtcConfig);
+                        const pc = new RTCPeerConnection(localRtcConfig);
                         peerConnections[viewer] = pc;
 
                         localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
                         pc.onicecandidate = (e) => {
-                            if (e.candidate) {
+                            if (e.candidate && isLocalCandidate(e.candidate)) {
                                 signalChannel.send({
                                     type: 'broadcast',
                                     event: 'signal',
@@ -412,58 +203,29 @@
 
                 document.getElementById('start-broadcast-btn').classList.add('hidden');
                 document.getElementById('stop-broadcast-btn').classList.remove('hidden');
-                document.getElementById('stream-modal').classList.add('hidden');
+                modal.classList.add('hidden');
 
-                fetchLiveStreams();
             } catch (err) {
                 alert("Could not start broadcast: " + err.message);
             }
         };
 
+        // --- Stop Broadcast Logic ---
         document.getElementById('stop-broadcast-btn').onclick = async () => {
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
             }
+            streamVideo.srcObject = null;
+            statusBadge.classList.add('hidden');
+
+            Object.values(peerConnections).forEach(pc => pc.close());
+
             await supabaseClient.from('streams').update({ is_live: false }).eq('username', currentUser.username);
+
             document.getElementById('start-broadcast-btn').classList.remove('hidden');
             document.getElementById('stop-broadcast-btn').classList.add('hidden');
-            fetchLiveStreams();
         };
-
-        function setupChat() {
-            const chatChan = supabaseClient.channel('vibe_chat');
-            chatChan.on('broadcast', { event: 'chat_msg' }, ({ payload }) => {
-                appendChatMessage(payload.sender, payload.message);
-            }).subscribe();
-
-            document.getElementById('chat-form').onsubmit = (e) => {
-                e.preventDefault();
-                const input = document.getElementById('chat-input');
-                const msg = input.value.trim();
-                if (!msg) return;
-
-                chatChan.send({
-                    type: 'broadcast',
-                    event: 'chat_msg',
-                    payload: { sender: currentUser.username, message: msg }
-                });
-                appendChatMessage(currentUser.username, msg);
-                input.value = '';
-            };
-        }
-
-        function appendChatMessage(sender, msg) {
-            const el = document.createElement('div');
-            el.className = "text-slate-300 leading-tight bg-slate-950/60 p-2 rounded-lg border border-slate-800/80";
-            el.innerHTML = `<b class="text-purple-400">${escapeHtml(sender)}:</b> ${escapeHtml(msg)}`;
-            chatBox.appendChild(el);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function escapeHtml(str) {
-            return (str || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
-        }
     </script>
 </body>
 </html>

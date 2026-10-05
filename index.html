@@ -50,7 +50,7 @@
             <div class="space-y-3">
                 <div>
                     <label class="text-[11px] font-bold text-slate-400 uppercase">Stream Title</label>
-                    <input type="text" id="broadcast-title-input" placeholder="e.g. Chill Gaming Session" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
+                    <input type="text" id="broadcast-title-input" placeholder="e.g. Gaming Stream" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-purple-500">
                 </div>
                 <div>
                     <label class="text-[11px] font-bold text-slate-400 uppercase">Video Source</label>
@@ -73,7 +73,7 @@
         </div>
     </div>
 
-    <!-- Header -->
+    <!-- Header Navigation -->
     <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shrink-0 gap-4">
         <div class="flex items-center gap-2.5 shrink-0">
             <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-base font-bold shadow-lg shadow-purple-600/30">👾</div>
@@ -100,7 +100,7 @@
         </div>
     </header>
 
-    <!-- Main Section -->
+    <!-- Main Layout -->
     <div class="flex-1 flex min-h-0 overflow-hidden">
         
         <!-- Stream List Sidebar -->
@@ -112,21 +112,26 @@
             <div id="streamers-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
         </aside>
 
-        <!-- Player Stage -->
+        <!-- Center Player -->
         <main class="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-hidden">
             <div class="flex-1 bg-black relative flex items-center justify-center">
-                <video id="stream-video" class="w-full h-full object-contain" autoplay playsinline controls></video>
+                <video id="stream-video" class="w-full h-full object-contain" autoplay playsinline controls muted></video>
 
                 <div id="live-indicator" class="hidden absolute top-4 left-4 bg-slate-950/80 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2 z-10">
                     <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
-                    <span id="active-stream-label" class="text-xs font-bold text-purple-400">Title of stream: Username</span>
+                    <span id="active-stream-label" class="text-xs font-bold text-purple-400">Stream Title: Username</span>
                 </div>
 
                 <div id="offline-placeholder" class="text-center space-y-2 p-6">
                     <div class="text-4xl">📺</div>
                     <div class="text-sm font-bold text-slate-400">No stream active</div>
-                    <p class="text-xs text-slate-600">Select an active stream on the left to start watching.</p>
+                    <p class="text-xs text-slate-600">Select an active stream on the left sidebar to watch.</p>
                 </div>
+            </div>
+
+            <!-- On-Screen Debug Console for Devices without DevTools -->
+            <div class="bg-slate-900 border-t border-slate-800 p-2 text-[11px] font-mono text-emerald-400 flex items-center justify-between">
+                <span id="status-bar">Status: Ready. Log in to start.</span>
             </div>
 
             <div class="bg-slate-900 border-t border-slate-800 p-4 flex items-center justify-between shrink-0">
@@ -140,7 +145,7 @@
             </div>
         </main>
 
-        <!-- Live Chat Sidebar -->
+        <!-- Right Chat Sidebar -->
         <aside class="w-72 bg-slate-900 border-l border-slate-800 flex flex-col shrink-0 hidden lg:flex">
             <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
                 <span>Live Chat</span>
@@ -159,10 +164,23 @@
         const SUPABASE_ANON_KEY = "sb_publishable_e_CqJETIOnvnJY5U4twlow_J9n1muxx";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // Combined STUN and multiple TURN servers
         const rtcConfig = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+                { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+                { urls: 'stun:global.xirsys.net' },
+                {
+                    urls: [
+                        "turn:global.xirsys.net:80?transport=udp",
+                        "turn:global.xirsys.net:3478?transport=udp",
+                        "turns:global.xirsys.net:443?transport=tcp"
+                    ],
+                    username: "huntah",
+                    credential: "669f8c30-c0ca-11f1-991b-0242ac150003"
+                }
             ]
         };
 
@@ -181,6 +199,11 @@
         const streamersList = document.getElementById('streamers-list');
         const searchInput = document.getElementById('search-input');
         const chatBox = document.getElementById('chat-box');
+        const statusBar = document.getElementById('status-bar');
+
+        function logStatus(text) {
+            statusBar.textContent = "Status: " + text;
+        }
 
         async function hashPassword(password) {
             const encoder = new TextEncoder();
@@ -222,8 +245,9 @@
 
         function showAuthError(msg) { authError.textContent = msg; authError.classList.remove('hidden'); }
 
-        function initSession(user) {
+        async function initSession(user) {
             currentUser = user;
+            logStatus("Logged in as " + user.username);
             document.getElementById('current-user-display').textContent = user.username;
             document.getElementById('user-avatar').textContent = user.username.charAt(0).toUpperCase();
             authModal.classList.add('hidden');
@@ -280,7 +304,9 @@
         document.getElementById('refresh-btn').onclick = fetchLiveStreams;
 
         function setupRealtimeSignaling() {
-            signalChannel = supabaseClient.channel('webrtc_signaling', { config: { broadcast: { self: false } } });
+            signalChannel = supabaseClient.channel('webrtc_signaling', {
+                config: { broadcast: { self: false, ack: true } }
+            });
             
             signalChannel.on('broadcast', { event: 'signal' }, async ({ payload }) => {
                 if (payload.target !== currentUser.username) return;
@@ -288,11 +314,16 @@
                 const sender = payload.sender;
 
                 if (payload.type === 'offer') {
+                    logStatus(`Received offer from ${sender}. Connecting...`);
                     const pc = new RTCPeerConnection(rtcConfig);
                     peerConnections[sender] = pc;
 
+                    pc.oniceconnectionstatechange = () => logStatus(`ICE State: ${pc.iceConnectionState}`);
+
                     pc.ontrack = (e) => {
+                        logStatus("Stream playing!");
                         streamVideo.srcObject = e.streams[0];
+                        streamVideo.muted = false;
                         streamVideo.play().catch(() => {});
                         document.getElementById('offline-placeholder').classList.add('hidden');
                         document.getElementById('live-indicator').classList.remove('hidden');
@@ -320,13 +351,16 @@
                     });
 
                 } else if (payload.type === 'answer' && peerConnections[sender]) {
+                    logStatus(`Answer received from ${sender}`);
                     await peerConnections[sender].setRemoteDescription(new RTCSessionDescription(payload.answer));
                 } else if (payload.type === 'candidate' && peerConnections[sender]) {
                     if (payload.candidate) {
                         await peerConnections[sender].addIceCandidate(new RTCIceCandidate(payload.candidate));
                     }
                 }
-            }).subscribe();
+            }).subscribe((status) => {
+                logStatus("Realtime Channel: " + status);
+            });
         }
 
         async function watchStream(stream) {
@@ -349,6 +383,7 @@
                 return;
             }
 
+            logStatus(`Connecting to ${stream.username}...`);
             signalChannel.send({
                 type: 'broadcast',
                 event: 'signal',
@@ -417,9 +452,13 @@
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'username' });
 
+                logStatus("Live Broadcast Active!");
+
                 signalChannel.on('broadcast', { event: 'signal' }, async ({ payload }) => {
                     if (payload.target === currentUser.username && payload.type === 'join_request') {
                         const viewer = payload.sender;
+                        logStatus(`Viewer ${viewer} joined. Sending stream...`);
+                        
                         const pc = new RTCPeerConnection(rtcConfig);
                         peerConnections[viewer] = pc;
 
@@ -464,6 +503,7 @@
             await supabaseClient.from('streams').update({ is_live: false }).eq('username', currentUser.username);
             document.getElementById('start-broadcast-btn').classList.remove('hidden');
             document.getElementById('stop-broadcast-btn').classList.add('hidden');
+            logStatus("Stream ended.");
             fetchLiveStreams();
         };
 
